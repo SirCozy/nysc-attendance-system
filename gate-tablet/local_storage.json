@@ -1,0 +1,21 @@
+{
+    "last_number": 4,
+    "records": [
+        {
+            "qr": "https://wa.me/qr/3UDLYXXGFDFJM1",
+            "number": 1
+        },
+        {
+            "qr": "3",
+            "number": 2
+        },
+        {
+            "qr": "610135",
+            "number": 3
+        },
+        {
+            "qr": "https://wa.me/message/ATDLKZ3ARIPWH1?src=qr",
+            "number": 4
+        }
+    ]
+}
