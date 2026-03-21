@@ -12,7 +12,6 @@ while True:
 
     ret, frame = cap.read()
 
-    # IMPORTANT FIX
     if not ret:
         continue
 
@@ -20,13 +19,20 @@ while True:
 
         qr_data = barcode.data.decode("utf-8")
 
-        if qr_data not in scanned:
+        # 1️⃣ Prevent duplicate scans (same session)
+        if qr_data in scanned:
+            continue
 
-            scanned.add(qr_data)
+        # 2️⃣ Validate QR format
+        if not qr_data.startswith("NYSC-2026-CDS"):
+            print("❌ Invalid QR")
+            continue
 
-            number = assign_number(qr_data)
+        scanned.add(qr_data)
 
-            print(f"Assigned Number: {number}")
+        number = assign_number(qr_data)
+
+        print(f"✅ Assigned Number: {number}")
 
     cv2.imshow("Gate Scanner", frame)
 
