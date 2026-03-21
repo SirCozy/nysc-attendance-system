@@ -1,96 +1,115 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>NYSC Attendance</title>
-
-<style>
-body{
-font-family: Arial;
-text-align:center;
-}
-
-.grid{
-display:grid;
-grid-template-columns:repeat(10,1fr);
-gap:10px;
-padding:20px;
-}
-
-.box{
-padding:30px;
-font-size:20px;
-background:#eee;
-cursor:pointer;
-border-radius:8px;
-text-align:center;
-}
-
-.marked{
-background:green;
-color:white;
-}
-</style>
-
+    <title>NYSC Attendance Grid</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .stats {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .box {
+            padding: 30px;
+            font-size: 20px;
+            background: #eee;
+            cursor: pointer;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .marked {
+            background: green;
+            color: white;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        input#search {
+            padding: 10px;
+            font-size: 18px;
+            width: 200px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
 </head>
-
 <body>
 
-<h2>NYSC Attendance Grid</h2>
+    <h2>NYSC Attendance Grid</h2>
 
-<input id="search" placeholder="Enter number..." style="padding:10px;font-size:18px;width:200px">
-<button onclick="findNumber()">Find</button>
-<div class="grid">
+    <div class="stats">
+        Total Corps Members: {{ total }} |
+        Present: {{ present }} |
+        Absent: {{ absent }}
+    </div>
 
-{% for i in numbers %}
+    <br>
 
-<div class="box {% if i in marked %}marked{% endif %}" onclick="mark({{i}},this)">
-{{i}}
-</div>
+    <input id="search" placeholder="Enter number...">
+    <button onclick="findNumber()">Find</button>
+    <a href="/export"><button>Download CSV</button></a>
 
-{% endfor %}
+    <div class="grid">
+        {% for r in records %}
+            <div class="box {% if r.number in marked %}marked{% endif %}" onclick="mark({{ r.number }}, this)">
+                {{ r.number }}
+            </div>
+        {% endfor %}
+    </div>
 
-</div>
+    <div class="pagination">
+        {% if page > 1 %}
+            <a href="/?page={{ page-1 }}"><button>Previous</button></a>
+        {% endif %}
+        <span> Page {{ page }} of {{ total_pages }} </span>
+        {% if page < total_pages %}
+            <a href="/?page={{ page+1 }}"><button>Next</button></a>
+        {% endif %}
+    </div>
 
-<script>
+    <script>
+        function mark(num, el) {
+            fetch("/mark", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({number: num})
+            })
+            .then(() => {
+                el.classList.add("marked");
+            });
+        }
 
-function mark(num,el){
+        function findNumber() {
+            let num = document.getElementById("search").value;
+            let boxes = document.querySelectorAll(".box");
+            boxes.forEach(box => {
+                box.style.border = "";
+            });
+            boxes.forEach(box => {
+                if (box.innerText == num) {
+                    box.scrollIntoView({behavior: "smooth", block: "center"});
+                    box.style.border = "4px solid red";
+                }
+            });
+        }
 
-fetch("/mark",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({number:num})
-})
-
-.then(()=>{
-el.classList.add("marked")
-})
-
-}
-
-function findNumber(){
-
-let num = document.getElementById("search").value
-
-let boxes = document.querySelectorAll(".box")
-
-boxes.forEach(box=>{
-box.style.border=""
-})
-
-boxes.forEach(box=>{
-if(box.innerText == num){
-box.scrollIntoView({behavior:"smooth",block:"center"})
-box.style.border="4px solid red"
-}
-})
-
-}
-
-setInterval(()=>{
-location.reload()
-},5000)
-
-</script>
+        // Auto-refresh every 5 seconds to show latest marks
+        setInterval(() => {
+            location.reload();
+        }, 5000);
+    </script>
 
 </body>
 </html>
