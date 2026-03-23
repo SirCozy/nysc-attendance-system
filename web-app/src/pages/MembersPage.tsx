@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllMembers, addMember, deleteMember } from '../lib/db';
 import { generateId } from '../lib/sync';
-import { sanitizeInput } from '../lib/auth';
 import type { CorpsMember } from '../types';
 
 export default function MembersPage() {
@@ -46,10 +45,10 @@ export default function MembersPage() {
     const qrData = `NYSC-${form.stateCode.trim().replace(/\//g, '-')}`;
     const member: CorpsMember = {
       id: generateId(),
-      fullName: sanitizeInput(form.fullName),
-      stateCode: sanitizeInput(form.stateCode).toUpperCase(),
-      cdsGroup: sanitizeInput(form.cdsGroup),
-      phone: sanitizeInput(form.phone),
+      fullName: form.fullName.trim(),
+      stateCode: form.stateCode.trim().toUpperCase(),
+      cdsGroup: form.cdsGroup.trim(),
+      phone: form.phone.trim(),
       qrData,
       registeredAt: Date.now(),
     };

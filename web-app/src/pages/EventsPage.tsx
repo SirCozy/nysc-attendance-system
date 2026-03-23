@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllEvents, addEvent, closeEvent, getActiveEvent, getAttendanceByEvent } from '../lib/db';
 import { generateId } from '../lib/sync';
-import { sanitizeInput } from '../lib/auth';
 import type { Event } from '../types';
 
 export default function EventsPage() {
@@ -51,9 +50,9 @@ export default function EventsPage() {
 
     const event: Event = {
       id: generateId(),
-      title: sanitizeInput(form.title),
+      title: form.title.trim(),
       date: form.date,
-      location: sanitizeInput(form.location),
+      location: form.location.trim(),
       createdBy: 'admin',
       createdAt: Date.now(),
       status: 'active',

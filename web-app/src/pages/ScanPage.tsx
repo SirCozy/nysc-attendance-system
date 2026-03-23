@@ -38,7 +38,7 @@ export default function ScanPage() {
   };
 
   const processQRData = useCallback(
-    async (qrData: string) => {
+    async (qrData: string, method: 'qr' | 'manual' = 'qr') => {
       if (!activeEvent) {
         addResult({ type: 'error', message: 'No active event. Create one from the Events page.' });
         return;
@@ -88,7 +88,7 @@ export default function ScanPage() {
         stateCode: member.stateCode,
         eventId: activeEvent.id,
         checkInTime: Date.now(),
-        method: 'qr',
+        method: method,
         synced: false,
         deviceId: getDeviceId(),
       });
@@ -105,7 +105,7 @@ export default function ScanPage() {
 
   const handleManualCheckIn = async () => {
     if (!manualCode.trim()) return;
-    await processQRData(manualCode.trim());
+    await processQRData(manualCode.trim(), 'manual');
     setManualCode('');
   };
 

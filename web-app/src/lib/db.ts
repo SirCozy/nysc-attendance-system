@@ -213,7 +213,8 @@ export async function getStats(eventId?: string): Promise<{
     : await getAllAttendance();
 
   const totalMembers = members.length;
-  const totalPresent = attendance.length;
+  const uniquePresentIds = new Set(attendance.map((a: AttendanceRecord) => a.memberId));
+  const totalPresent = uniquePresentIds.size;
   const totalAbsent = Math.max(0, totalMembers - totalPresent);
   const attendanceRate = totalMembers > 0 ? Math.round((totalPresent / totalMembers) * 100) : 0;
 
