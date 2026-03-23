@@ -53,7 +53,6 @@ web-app/
 ├── public/
 │   ├── icons/              # PWA icons (192x192, 512x512)
 │   ├── manifest.json       # PWA manifest
-│   ├── sw.js              # Service worker
 │   └── vite.svg           # Favicon
 ├── src/
 │   ├── components/        # Reusable UI components
