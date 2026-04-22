@@ -18,6 +18,7 @@ export interface AttendanceRecord {
   method: 'qr' | 'manual';
   synced: boolean;
   deviceId: string;
+  shortCode?: string;
 }
 
 export interface Event {

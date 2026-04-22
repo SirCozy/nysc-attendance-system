@@ -9,6 +9,7 @@ import {
   addMember,
 } from '../lib/db';
 import { generateId, getDeviceId } from '../lib/sync';
+import { generateShortCode } from '../utils/shortCode';
 import type { Event } from '../types';
 
 interface ScanResult {
@@ -91,6 +92,7 @@ export default function ScanPage() {
         method: method,
         synced: false,
         deviceId: getDeviceId(),
+        shortCode: generateShortCode(6),
       });
 
       setScanCount((prev) => prev + 1);
