@@ -10,7 +10,7 @@ export async function getDB(): Promise<IDBPDatabase> {
   if (dbInstance) return dbInstance;
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
+    upgrade(db, _oldVersion) {
       // Corps Members store (now Members)
       if (!db.objectStoreNames.contains('members')) {
         const memberStore = db.createObjectStore('members', { keyPath: 'id' });
