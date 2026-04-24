@@ -1,8 +1,8 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { CorpsMember, AttendanceRecord, Event, AdminUser, SyncQueueItem } from '../types';
+import type { Member, AttendanceRecord, Event, AdminUser, SyncQueueItem } from '../types';
 
 const DB_NAME = 'nysc-attendance';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -10,8 +10,8 @@ export async function getDB(): Promise<IDBPDatabase> {
   if (dbInstance) return dbInstance;
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Corps Members store
+    upgrade(db, oldVersion) {
+      // Corps Members store (now Members)
       if (!db.objectStoreNames.contains('members')) {
         const memberStore = db.createObjectStore('members', { keyPath: 'id' });
         memberStore.createIndex('stateCode', 'stateCode', { unique: true });
@@ -24,7 +24,32 @@ export async function getDB(): Promise<IDBPDatabase> {
         attendanceStore.createIndex('eventId', 'eventId', { unique: false });
         attendanceStore.createIndex('memberId', 'memberId', { unique: false });
         attendanceStore.createIndex('synced', 'synced', { unique: false });
-        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: true });
+        attendanceStore.createIndex('memberEventType', ['memberId', 'eventId', 'type'], { unique: true });
+      } else if (oldVersion < 2) {
+        // Migrate from version 1: add type field and update index
+        const attendanceStore = db.transaction.objectStore('attendance');
+
+        // Delete old index if exists
+        if (attendanceStore.indexNames.contains('memberEvent')) {
+          attendanceStore.deleteIndex('memberEvent');
+        }
+
+        // Create new index
+        attendanceStore.createIndex('memberEventType', ['memberId', 'eventId', 'type'], { unique: true });
+
+        // Migrate data: add type: 'IN' to existing records using cursor
+        const cursorRequest = attendanceStore.openCursor();
+        cursorRequest.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            const record = cursor.value;
+            if (!record.type) {
+              record.type = 'IN';
+              cursor.update(record);
+            }
+            cursor.continue();
+          }
+        };
       }
 
       // Events store
@@ -51,27 +76,32 @@ export async function getDB(): Promise<IDBPDatabase> {
 
 // ============ MEMBERS ============
 
-export async function addMember(member: CorpsMember): Promise<void> {
+export async function addMember(member: Member): Promise<void> {
   const db = await getDB();
   await db.put('members', member);
 }
 
-export async function getMember(id: string): Promise<CorpsMember | undefined> {
+export async function updateMember(member: Member): Promise<void> {
+  const db = await getDB();
+  await db.put('members', member);
+}
+
+export async function getMember(id: string): Promise<Member | undefined> {
   const db = await getDB();
   return db.get('members', id);
 }
 
-export async function getMemberByStateCode(stateCode: string): Promise<CorpsMember | undefined> {
+export async function getMemberByStateCode(stateCode: string): Promise<Member | undefined> {
   const db = await getDB();
   return db.getFromIndex('members', 'stateCode', stateCode);
 }
 
-export async function getMemberByQR(qrData: string): Promise<CorpsMember | undefined> {
+export async function getMemberByQR(qrData: string): Promise<Member | undefined> {
   const db = await getDB();
   return db.getFromIndex('members', 'qrData', qrData);
 }
 
-export async function getAllMembers(): Promise<CorpsMember[]> {
+export async function getAllMembers(): Promise<Member[]> {
   const db = await getDB();
   return db.getAll('members');
 }
@@ -88,14 +118,19 @@ export async function addAttendance(record: AttendanceRecord): Promise<void> {
   await db.put('attendance', record);
 }
 
+export async function updateAttendance(record: AttendanceRecord): Promise<void> {
+  const db = await getDB();
+  await db.put('attendance', record);
+}
+
 export async function getAttendanceByEvent(eventId: string): Promise<AttendanceRecord[]> {
   const db = await getDB();
   return db.getAllFromIndex('attendance', 'eventId', eventId);
 }
 
-export async function checkDuplicateAttendance(memberId: string, eventId: string): Promise<boolean> {
+export async function checkDuplicateAttendance(memberId: string, eventId: string, type: 'IN' | 'OUT'): Promise<boolean> {
   const db = await getDB();
-  const existing = await db.getFromIndex('attendance', 'memberEvent', [memberId, eventId]);
+  const existing = await db.getFromIndex('attendance', 'memberEventType', [memberId, eventId, type]);
   return !!existing;
 }
 
@@ -122,6 +157,11 @@ export async function getAllAttendance(): Promise<AttendanceRecord[]> {
 // ============ EVENTS ============
 
 export async function addEvent(event: Event): Promise<void> {
+  const db = await getDB();
+  await db.put('events', event);
+}
+
+export async function updateEvent(event: Event): Promise<void> {
   const db = await getDB();
   await db.put('events', event);
 }
@@ -154,6 +194,11 @@ export async function closeEvent(id: string): Promise<void> {
 // ============ ADMINS ============
 
 export async function addAdmin(admin: AdminUser): Promise<void> {
+  const db = await getDB();
+  await db.put('admins', admin);
+}
+
+export async function updateAdmin(admin: AdminUser): Promise<void> {
   const db = await getDB();
   await db.put('admins', admin);
 }

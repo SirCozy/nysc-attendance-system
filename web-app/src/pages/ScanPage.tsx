@@ -1,21 +1,22 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import QRScanner from '../components/QRScanner';
 import {
-  getMemberByQR,
+  getMember,
   addAttendance,
-  checkDuplicateAttendance,
+  getAttendanceByEvent,
   getActiveEvent,
   getAllMembers,
   addMember,
 } from '../lib/db';
 import { generateId, getDeviceId } from '../lib/sync';
 import { generateShortCode } from '../utils/shortCode';
-import type { Event } from '../types';
+import type { Event, AttendanceRecord } from '../types';
 
 interface ScanResult {
-  type: 'success' | 'duplicate' | 'error' | 'not-found';
+  type: 'success' | 'duplicate' | 'error' | 'not-found' | 'debounced';
   message: string;
   memberName?: string;
+  attendanceType?: 'IN' | 'OUT';
 }
 
 export default function ScanPage() {
@@ -24,6 +25,7 @@ export default function ScanPage() {
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [scanCount, setScanCount] = useState(0);
   const [manualCode, setManualCode] = useState('');
+  const lastScanTimes = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     loadActiveEvent();
@@ -45,37 +47,40 @@ export default function ScanPage() {
         return;
       }
 
-      // Validate QR format
-      if (!qrData.startsWith('NYSC-')) {
-        addResult({ type: 'error', message: `Invalid QR code format: ${qrData}` });
+      // Decode QR to memberId (assume QR data is memberId)
+      const memberId = qrData.trim();
+
+      // Check debounce: prevent rapid scans for same member
+      const now = Date.now();
+      const lastScan = lastScanTimes.current.get(memberId);
+      if (lastScan && now - lastScan < 5000) { // 5 seconds debounce
+        addResult({ type: 'debounced', message: 'Please wait before scanning again.' });
         return;
       }
 
-      // Look up member
-      let member = await getMemberByQR(qrData);
-
-      // Auto-register if member not found (for quick setup)
+      // Look up member by ID
+      const member = await getMember(memberId);
       if (!member) {
-        const parts = qrData.split('-');
-        const memberNumber = parts[parts.length - 1] ?? qrData;
-        member = {
-          id: generateId(),
-          stateCode: qrData,
-          fullName: `Member ${memberNumber}`,
-          cdsGroup: 'Default CDS',
-          phone: '',
-          qrData: qrData,
-          registeredAt: Date.now(),
-        };
-        await addMember(member);
+        addResult({ type: 'not-found', message: `Member not found: ${memberId}` });
+        return;
       }
 
-      // Check for duplicate
-      const isDuplicate = await checkDuplicateAttendance(member.id, activeEvent.id);
-      if (isDuplicate) {
+      // Get existing attendance for this member and event
+      const eventAttendance = await getAttendanceByEvent(activeEvent.id);
+      const memberAttendance = eventAttendance.filter(a => a.memberId === memberId);
+
+      const hasCheckIn = memberAttendance.some(a => a.type === 'IN');
+      const hasCheckOut = memberAttendance.some(a => a.type === 'OUT');
+
+      let attendanceType: 'IN' | 'OUT';
+      if (!hasCheckIn) {
+        attendanceType = 'IN';
+      } else if (!hasCheckOut) {
+        attendanceType = 'OUT';
+      } else {
         addResult({
           type: 'duplicate',
-          message: `Already checked in: ${member.fullName}`,
+          message: `Already checked out: ${member.fullName}`,
           memberName: member.fullName,
         });
         return;
@@ -88,18 +93,23 @@ export default function ScanPage() {
         memberName: member.fullName,
         stateCode: member.stateCode,
         eventId: activeEvent.id,
-        checkInTime: Date.now(),
+        timestamp: now,
+        type: attendanceType,
         method: method,
         synced: false,
         deviceId: getDeviceId(),
         shortCode: generateShortCode(6),
       });
 
+      // Update last scan time
+      lastScanTimes.current.set(memberId, now);
+
       setScanCount((prev) => prev + 1);
       addResult({
         type: 'success',
-        message: `Checked in: ${member.fullName} (${member.stateCode})`,
+        message: `${attendanceType === 'IN' ? 'Checked in' : 'Checked out'}: ${member.fullName} (${member.stateCode})`,
         memberName: member.fullName,
+        attendanceType,
       });
     },
     [activeEvent]
@@ -123,7 +133,7 @@ export default function ScanPage() {
       for (let i = 1; i <= 20; i++) {
         const code = `NYSC-2026-CDS-${i.toString().padStart(3, '0')}`;
         await addMember({
-          id: generateId(),
+          id: code, // Use code as ID for demo
           stateCode: code,
           fullName: `Corps Member ${i}`,
           cdsGroup: 'Default CDS Group',
@@ -174,7 +184,7 @@ export default function ScanPage() {
           <input
             type="text"
             className="input-field"
-            placeholder="Enter QR code data (e.g., NYSC-2026-CDS-001)"
+            placeholder="Enter member ID (e.g., NYSC-2026-CDS-001)"
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleManualCheckIn()}
@@ -192,14 +202,18 @@ export default function ScanPage() {
         ) : (
           <ul className="result-list">
             {results.map((result, index) => (
-              <li key={index} className={`result-item result-${result.type}`}>
+              <li key={index} className={`result-item result-${result.type} ${result.attendanceType ? `result-${result.attendanceType.toLowerCase()}` : ''}`}>
                 <span className="result-icon">
                   {result.type === 'success' && '\u2713'}
                   {result.type === 'duplicate' && '\u26A0'}
                   {result.type === 'error' && '\u2717'}
                   {result.type === 'not-found' && '?'}
+                  {result.type === 'debounced' && '\u23F3'}
                 </span>
-                <span className="result-message">{result.message}</span>
+                <span className="result-message">
+                  {result.attendanceType && <span className={`attendance-badge badge-${result.attendanceType.toLowerCase()}`}>{result.attendanceType}</span>}
+                  {result.message}
+                </span>
               </li>
             ))}
           </ul>

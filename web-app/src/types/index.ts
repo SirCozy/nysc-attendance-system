@@ -1,4 +1,4 @@
-export interface CorpsMember {
+export interface Member {
   id: string;
   stateCode: string;
   fullName: string;
@@ -14,7 +14,8 @@ export interface AttendanceRecord {
   memberName: string;
   stateCode: string;
   eventId: string;
-  checkInTime: number;
+  timestamp: number;
+  type: 'IN' | 'OUT';
   method: 'qr' | 'manual';
   synced: boolean;
   deviceId: string;
