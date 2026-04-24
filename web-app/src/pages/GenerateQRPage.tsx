@@ -70,10 +70,9 @@ export default function GenerateQRPage() {
             <div className="form-group">
               <label>Start Number</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 className="input-field"
-                min={1}
-                max={999}
                 value={batchStartInput}
                 onChange={(e) => {
                   const next = e.target.value;
@@ -90,10 +89,9 @@ export default function GenerateQRPage() {
             <div className="form-group">
               <label>End Number</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 className="input-field"
-                min={1}
-                max={999}
                 value={batchEndInput}
                 onChange={(e) => {
                   const next = e.target.value;
