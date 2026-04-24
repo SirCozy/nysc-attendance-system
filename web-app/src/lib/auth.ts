@@ -1,37 +1,37 @@
-import { getAdminByName, seedDefaultAdmin } from './db';
-import type { AdminUser } from '../types';
-
 const SESSION_KEY = 'nysc-session';
+const PIN_KEY = 'admin_pin';
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
 
 interface Session {
   adminId: string;
   adminName: string;
-  role: AdminUser['role'];
+  role: 'admin';
   expiresAt: number;
 }
 
 /**
- * Initialize auth - seed default admin if needed.
- */
-export async function initAuth(): Promise<void> {
-  await seedDefaultAdmin();
-}
-
-/**
- * Authenticate an admin by name and PIN.
+ * Authenticate an admin by PIN, or initialize PIN on first use.
  */
 export async function login(name: string, pin: string): Promise<Session | null> {
-  const admin = await getAdminByName(name.toLowerCase().trim());
+  const normalizedPin = pin.trim();
+  const storedPin = localStorage.getItem(PIN_KEY);
 
-  if (!admin || admin.pin !== pin) {
+  if (!/^[0-9]{4,8}$/.test(normalizedPin)) {
     return null;
   }
 
+  if (storedPin && storedPin !== normalizedPin) {
+    return null;
+  }
+
+  if (!storedPin) {
+    localStorage.setItem(PIN_KEY, normalizedPin);
+  }
+
   const session: Session = {
-    adminId: admin.id,
-    adminName: admin.name,
-    role: admin.role,
+    adminId: 'admin',
+    adminName: name.trim() || 'Admin',
+    role: 'admin',
     expiresAt: Date.now() + SESSION_DURATION,
   };
 

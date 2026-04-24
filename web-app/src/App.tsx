@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard';
 import MembersPage from './pages/MembersPage';
 import EventsPage from './pages/EventsPage';
 import GenerateQRPage from './pages/GenerateQRPage';
-import { initAuth, getSession, logout } from './lib/auth';
+import { getSession, logout } from './lib/auth';
 import { setupAutoSync } from './lib/sync';
 import type { AppView } from './types';
 import './App.css';
@@ -17,16 +17,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const init = async () => {
-      await initAuth();
-      const session = getSession();
-      if (session) {
-        setAdminName(session.adminName);
-        setView('dashboard');
-      }
-      setLoading(false);
-    };
-    init();
+    const session = getSession();
+    if (session) {
+      setAdminName(session.adminName);
+      setView('dashboard');
+    }
+    setLoading(false);
 
     const cleanupSync = setupAutoSync();
     return cleanupSync;

@@ -188,17 +188,7 @@ export async function removeSyncQueueItem(id: string): Promise<void> {
 // ============ SEED DATA ============
 
 export async function seedDefaultAdmin(): Promise<void> {
-  const db = await getDB();
-  const admins = await db.getAll('admins');
-  if (admins.length === 0) {
-    await addAdmin({
-      id: 'admin-001',
-      name: 'admin',
-      pin: '1234',
-      role: 'admin',
-      createdAt: Date.now(),
-    });
-  }
+  // No default admin is created when local PIN authentication is used.
 }
 
 export async function getStats(eventId?: string): Promise<{
