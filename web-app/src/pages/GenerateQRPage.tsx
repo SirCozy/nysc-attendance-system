@@ -6,9 +6,12 @@ import type { CorpsMember } from '../types';
 export default function GenerateQRPage() {
   const [members, setMembers] = useState<CorpsMember[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [batchStart, setBatchStart] = useState(1);
-  const [batchEnd, setBatchEnd] = useState(20);
+  const [batchStartInput, setBatchStartInput] = useState('1');
+  const [batchEndInput, setBatchEndInput] = useState('20');
   const [mode, setMode] = useState<'members' | 'batch'>('batch');
+
+  const batchStart = Math.max(1, Math.min(999, parseInt(batchStartInput, 10) || 1));
+  const batchEnd = Math.max(1, Math.min(999, parseInt(batchEndInput, 10) || 20));
 
   useEffect(() => {
     loadMembers();
@@ -71,8 +74,17 @@ export default function GenerateQRPage() {
                 className="input-field"
                 min={1}
                 max={999}
-                value={batchStart}
-                onChange={(e) => setBatchStart(parseInt(e.target.value) || 1)}
+                value={batchStartInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (/^\d*$/.test(next)) {
+                    setBatchStartInput(next);
+                  }
+                }}
+                onBlur={() => {
+                  const normalized = batchStartInput.replace(/^0+/, '') || '1';
+                  setBatchStartInput(String(Math.max(1, Math.min(999, parseInt(normalized, 10)))));
+                }}
               />
             </div>
             <div className="form-group">
@@ -82,8 +94,17 @@ export default function GenerateQRPage() {
                 className="input-field"
                 min={1}
                 max={999}
-                value={batchEnd}
-                onChange={(e) => setBatchEnd(parseInt(e.target.value) || 20)}
+                value={batchEndInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (/^\d*$/.test(next)) {
+                    setBatchEndInput(next);
+                  }
+                }}
+                onBlur={() => {
+                  const normalized = batchEndInput.replace(/^0+/, '') || '20';
+                  setBatchEndInput(String(Math.max(1, Math.min(999, parseInt(normalized, 10)))));
+                }}
               />
             </div>
           </div>
