@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import QRGenerator from '../components/QRGenerator';
 import { getAllMembers } from '../lib/db';
-import type { CorpsMember } from '../types';
+import type { Member } from '../types';
 
 export default function GenerateQRPage() {
-  const [members, setMembers] = useState<CorpsMember[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [batchStartInput, setBatchStartInput] = useState('1');
   const [batchEndInput, setBatchEndInput] = useState('20');

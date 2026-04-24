@@ -3,12 +3,12 @@ import AttendanceGrid from '../components/AttendanceGrid';
 import SyncStatus from '../components/SyncStatus';
 import { getStats, getActiveEvent, getAttendanceByEvent, getAllMembers, getAllAttendance } from '../lib/db';
 import { exportToCSV, downloadCSV, syncAttendance } from '../lib/sync';
-import type { AttendanceRecord, CorpsMember, Event } from '../types';
+import type { AttendanceRecord, Member, Event } from '../types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ totalMembers: 0, totalPresent: 0, totalAbsent: 0, attendanceRate: 0 });
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [members, setMembers] = useState<CorpsMember[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -39,6 +39,8 @@ export default function Dashboard() {
       memberName: r.memberName,
       stateCode: r.stateCode,
       checkInTime: r.checkInTime,
+      checkOutTime: r.checkOutTime,
+      status: r.status,
       method: r.method,
     }));
     const csv = exportToCSV(data);

@@ -14,8 +14,9 @@ export interface AttendanceRecord {
   memberName: string;
   stateCode: string;
   eventId: string;
-  timestamp: number;
-  type: 'IN' | 'OUT';
+  checkInTime: number | null;
+  checkOutTime: number | null;
+  status: 'IN' | 'OUT';
   method: 'qr' | 'manual';
   synced: boolean;
   deviceId: string;

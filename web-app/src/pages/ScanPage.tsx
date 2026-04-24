@@ -3,14 +3,15 @@ import QRScanner from '../components/QRScanner';
 import {
   getMember,
   addAttendance,
-  getAttendanceByEvent,
+  updateAttendance,
+  getAttendanceByMemberAndEvent,
   getActiveEvent,
   getAllMembers,
   addMember,
 } from '../lib/db';
 import { generateId, getDeviceId } from '../lib/sync';
 import { generateShortCode } from '../utils/shortCode';
-import type { Event, AttendanceRecord } from '../types';
+import type { Event } from '../types';
 
 interface ScanResult {
   type: 'success' | 'duplicate' | 'error' | 'not-found' | 'debounced';
@@ -65,19 +66,37 @@ export default function ScanPage() {
         return;
       }
 
-      // Get existing attendance for this member and event
-      const eventAttendance = await getAttendanceByEvent(activeEvent.id);
-      const memberAttendance = eventAttendance.filter(a => a.memberId === memberId);
+      // Get existing attendance record for this member and event
+      const existing = await getAttendanceByMemberAndEvent(memberId, activeEvent.id);
 
-      const hasCheckIn = memberAttendance.some(a => a.type === 'IN');
-      const hasCheckOut = memberAttendance.some(a => a.type === 'OUT');
-
-      let attendanceType: 'IN' | 'OUT';
-      if (!hasCheckIn) {
-        attendanceType = 'IN';
-      } else if (!hasCheckOut) {
-        attendanceType = 'OUT';
+      let attendanceStatus: 'IN' | 'OUT';
+      if (!existing) {
+        // First scan: check-in
+        attendanceStatus = 'IN';
+        await addAttendance({
+          id: generateId(),
+          memberId: member.id,
+          memberName: member.fullName,
+          stateCode: member.stateCode,
+          eventId: activeEvent.id,
+          checkInTime: now,
+          checkOutTime: null,
+          status: 'IN',
+          method: method,
+          synced: false,
+          deviceId: getDeviceId(),
+          shortCode: generateShortCode(6),
+        });
+      } else if (existing.status === 'IN') {
+        // Second scan: check-out
+        attendanceStatus = 'OUT';
+        await updateAttendance({
+          ...existing,
+          checkOutTime: now,
+          status: 'OUT',
+        });
       } else {
+        // Already checked out
         addResult({
           type: 'duplicate',
           message: `Already checked out: ${member.fullName}`,
@@ -86,30 +105,15 @@ export default function ScanPage() {
         return;
       }
 
-      // Record attendance
-      await addAttendance({
-        id: generateId(),
-        memberId: member.id,
-        memberName: member.fullName,
-        stateCode: member.stateCode,
-        eventId: activeEvent.id,
-        timestamp: now,
-        type: attendanceType,
-        method: method,
-        synced: false,
-        deviceId: getDeviceId(),
-        shortCode: generateShortCode(6),
-      });
-
       // Update last scan time
       lastScanTimes.current.set(memberId, now);
 
       setScanCount((prev) => prev + 1);
       addResult({
         type: 'success',
-        message: `${attendanceType === 'IN' ? 'Checked in' : 'Checked out'}: ${member.fullName} (${member.stateCode})`,
+        message: `${attendanceStatus === 'IN' ? 'Checked in' : 'Checked out'}: ${member.fullName} (${member.stateCode})`,
         memberName: member.fullName,
-        attendanceType,
+        attendanceType: attendanceStatus,
       });
     },
     [activeEvent]

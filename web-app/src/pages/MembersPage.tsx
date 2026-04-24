@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getAllMembers, addMember, deleteMember } from '../lib/db';
 import { generateId } from '../lib/sync';
-import type { CorpsMember } from '../types';
+import type { Member } from '../types';
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<CorpsMember[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({
@@ -43,7 +43,7 @@ export default function MembersPage() {
     }
 
     const qrData = `NYSC-${form.stateCode.trim().replace(/\//g, '-')}`;
-    const member: CorpsMember = {
+    const member: Member = {
       id: generateId(),
       fullName: form.fullName.trim(),
       stateCode: form.stateCode.trim().toUpperCase(),

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { AttendanceRecord, CorpsMember } from '../types';
+import type { AttendanceRecord, Member } from '../types';
 
 interface AttendanceGridProps {
   records: AttendanceRecord[];
-  members: CorpsMember[];
+  members: Member[];
   onExport: () => void;
 }
 
@@ -25,7 +25,7 @@ export default function AttendanceGrid({ records, members, onExport }: Attendanc
 
   const getCheckInTime = (memberId: string): string => {
     const record = records.find((r) => r.memberId === memberId);
-    if (!record) return '-';
+    if (!record || !record.checkInTime) return '-';
     return new Date(record.checkInTime).toLocaleTimeString();
   };
 

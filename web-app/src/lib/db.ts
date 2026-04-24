@@ -24,32 +24,7 @@ export async function getDB(): Promise<IDBPDatabase> {
         attendanceStore.createIndex('eventId', 'eventId', { unique: false });
         attendanceStore.createIndex('memberId', 'memberId', { unique: false });
         attendanceStore.createIndex('synced', 'synced', { unique: false });
-        attendanceStore.createIndex('memberEventType', ['memberId', 'eventId', 'type'], { unique: true });
-      } else if (oldVersion < 2) {
-        // Migrate from version 1: add type field and update index
-        const attendanceStore = db.transaction.objectStore('attendance');
-
-        // Delete old index if exists
-        if (attendanceStore.indexNames.contains('memberEvent')) {
-          attendanceStore.deleteIndex('memberEvent');
-        }
-
-        // Create new index
-        attendanceStore.createIndex('memberEventType', ['memberId', 'eventId', 'type'], { unique: true });
-
-        // Migrate data: add type: 'IN' to existing records using cursor
-        const cursorRequest = attendanceStore.openCursor();
-        cursorRequest.onsuccess = (event) => {
-          const cursor = (event.target as IDBRequest).result;
-          if (cursor) {
-            const record = cursor.value;
-            if (!record.type) {
-              record.type = 'IN';
-              cursor.update(record);
-            }
-            cursor.continue();
-          }
-        };
+        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: true });
       }
 
       // Events store
@@ -123,14 +98,19 @@ export async function updateAttendance(record: AttendanceRecord): Promise<void> 
   await db.put('attendance', record);
 }
 
+export async function getAttendanceByMemberAndEvent(memberId: string, eventId: string): Promise<AttendanceRecord | undefined> {
+  const db = await getDB();
+  return db.getFromIndex('attendance', 'memberEvent', [memberId, eventId]);
+}
+
 export async function getAttendanceByEvent(eventId: string): Promise<AttendanceRecord[]> {
   const db = await getDB();
   return db.getAllFromIndex('attendance', 'eventId', eventId);
 }
 
-export async function checkDuplicateAttendance(memberId: string, eventId: string, type: 'IN' | 'OUT'): Promise<boolean> {
+export async function checkDuplicateAttendance(memberId: string, eventId: string): Promise<boolean> {
   const db = await getDB();
-  const existing = await db.getFromIndex('attendance', 'memberEventType', [memberId, eventId, type]);
+  const existing = await db.getFromIndex('attendance', 'memberEvent', [memberId, eventId]);
   return !!existing;
 }
 
