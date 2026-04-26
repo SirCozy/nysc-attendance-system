@@ -1,5 +1,7 @@
+import type { AppView } from '../types';
+
 interface LandingProps {
-  onNavigate: (view: 'member-login' | 'member-signup' | 'login') => void;
+  onNavigate: (view: AppView) => void;
 }
 
 export default function Landing({ onNavigate }: LandingProps) {

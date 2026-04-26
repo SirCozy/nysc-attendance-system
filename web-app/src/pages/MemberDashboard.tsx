@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getMember, getLatestAttendanceForMemberEvent, getActiveEvent } from '../lib/db';
 import { getSession } from '../lib/auth';
-import type { Member, Event, AttendanceRecord } from '../types';
+import type { AppView, Member, Event, AttendanceRecord } from '../types';
 
 interface MemberDashboardProps {
-  onNavigate: (view: string) => void;
+  onNavigate: (view: AppView) => void;
 }
 
 export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
