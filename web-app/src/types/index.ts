@@ -5,7 +5,11 @@ export interface Member {
   cdsGroup: string;
   phone: string;
   qrData: string;
+  pin: string;
+  serviceYear: string;
+  role: 'admin' | 'member';
   registeredAt: number;
+  lastScanTime?: number; // for cooldown
 }
 
 export interface AttendanceRecord {
@@ -14,10 +18,8 @@ export interface AttendanceRecord {
   memberName: string;
   stateCode: string;
   eventId: string;
-  checkInTime: number | null;
-  checkOutTime: number | null;
-  status: 'IN' | 'OUT';
-  method: 'qr' | 'manual';
+  timestamp: number;
+  type: 'CHECK-IN' | 'CHECK-OUT';
   synced: boolean;
   deviceId: string;
   shortCode?: string;
@@ -27,17 +29,18 @@ export interface Event {
   id: string;
   title: string;
   date: string;
-  location: string;
+  time: string;
+  qrData: string;
   createdBy: string;
   createdAt: number;
-  status: 'active' | 'closed';
+  status: 'ACTIVE' | 'ENDED';
+  location?: string;
 }
 
 export interface AdminUser {
   id: string;
-  name: string;
   pin: string;
-  role: 'lgi_officer' | 'admin';
+  role: 'admin';
   createdAt: number;
 }
 

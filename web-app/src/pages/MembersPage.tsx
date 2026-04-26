@@ -12,6 +12,8 @@ export default function MembersPage() {
     stateCode: '',
     cdsGroup: '',
     phone: '',
+    pin: '',
+    serviceYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
   });
   const [error, setError] = useState('');
 
@@ -28,17 +30,18 @@ export default function MembersPage() {
     e.preventDefault();
     setError('');
 
-    if (!form.fullName.trim() || !form.stateCode.trim()) {
-      setError('Name and State Code are required');
+    if (!form.fullName.trim() || !form.stateCode.trim() || !form.pin.trim()) {
+      setError('Name, state code, and PIN are required');
       return;
     }
 
-    // Check for duplicate state code
-    const existing = members.find(
-      (m) => m.stateCode.toLowerCase() === form.stateCode.trim().toLowerCase()
+    // Check for duplicate state code or PIN
+    const existing = members.find((m) =>
+      m.stateCode.toLowerCase() === form.stateCode.trim().toLowerCase() ||
+      m.pin === form.pin.trim()
     );
     if (existing) {
-      setError('A member with this state code already exists');
+      setError('A member with this state code or PIN already exists');
       return;
     }
 
@@ -50,11 +53,21 @@ export default function MembersPage() {
       cdsGroup: form.cdsGroup.trim(),
       phone: form.phone.trim(),
       qrData,
+      pin: form.pin.trim(),
+      serviceYear: form.serviceYear.trim(),
+      role: 'member',
       registeredAt: Date.now(),
     };
 
     await addMember(member);
-    setForm({ fullName: '', stateCode: '', cdsGroup: '', phone: '' });
+    setForm({
+      fullName: '',
+      stateCode: '',
+      cdsGroup: '',
+      phone: '',
+      pin: '',
+      serviceYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    });
     setShowForm(false);
     await loadMembers();
   };
@@ -107,6 +120,29 @@ export default function MembersPage() {
                 value={form.stateCode}
                 onChange={(e) => setForm({ ...form, stateCode: e.target.value })}
                 required
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Member PIN *</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="4-8 digit PIN"
+                value={form.pin}
+                onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 8) })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Service Year</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="e.g., 2025-2026"
+                value={form.serviceYear}
+                onChange={(e) => setForm({ ...form, serviceYear: e.target.value })}
               />
             </div>
           </div>

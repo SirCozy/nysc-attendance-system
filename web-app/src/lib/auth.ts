@@ -1,42 +1,91 @@
+import { addAdmin, getAdminByPin, getAllAdmins, getMemberByPin } from './db';
+import type { AdminUser } from '../types';
+
 const SESSION_KEY = 'nysc-session';
-const PIN_KEY = 'admin_pin';
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
 
 interface Session {
-  adminId: string;
-  adminName: string;
-  role: 'admin';
+  userId: string;
+  userName: string;
+  role: 'admin' | 'member';
   expiresAt: number;
 }
 
 /**
- * Authenticate an admin by PIN, or initialize PIN on first use.
+ * Authenticate by PIN. Members log in with member PINs; admins use admin PIN.
+ * If no admin exists yet, the first admin PIN is created on first login.
  */
-export async function login(name: string, pin: string): Promise<Session | null> {
+export async function login(pin: string): Promise<Session | null> {
   const normalizedPin = pin.trim();
-  const storedPin = localStorage.getItem(PIN_KEY);
 
   if (!/^[0-9]{4,8}$/.test(normalizedPin)) {
     return null;
   }
 
-  if (storedPin && storedPin !== normalizedPin) {
-    return null;
+  const member = await getMemberByPin(normalizedPin);
+  if (member) {
+    const currentYear = new Date().getFullYear();
+    const parts = member.serviceYear.split('-');
+    if (parts.length !== 2) {
+      return null;
+    }
+    const startPart = parts[0] ?? '';
+    const endPart = parts[1] ?? '';
+    if (!startPart || !endPart) {
+      return null;
+    }
+    const startYear = parseInt(startPart, 10);
+    const endYear = parseInt(endPart, 10);
+    if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
+      return null;
+    }
+    if (endYear < currentYear) {
+      return null;
+    }
+
+    const session: Session = {
+      userId: member.id,
+      userName: member.fullName,
+      role: 'member',
+      expiresAt: Date.now() + SESSION_DURATION,
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
   }
 
-  if (!storedPin) {
-    localStorage.setItem(PIN_KEY, normalizedPin);
+  const admin = await getAdminByPin(normalizedPin);
+  if (admin) {
+    const session: Session = {
+      userId: admin.id,
+      userName: 'Admin',
+      role: 'admin',
+      expiresAt: Date.now() + SESSION_DURATION,
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
   }
 
-  const session: Session = {
-    adminId: 'admin',
-    adminName: name.trim() || 'Admin',
-    role: 'admin',
-    expiresAt: Date.now() + SESSION_DURATION,
-  };
+  const admins = await getAllAdmins();
+  if (admins.length === 0) {
+    const newAdmin: AdminUser = {
+      id: `admin-${Date.now()}`,
+      pin: normalizedPin,
+      role: 'admin',
+      createdAt: Date.now(),
+    };
+    await addAdmin(newAdmin);
 
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
+    const session: Session = {
+      userId: newAdmin.id,
+      userName: 'Admin',
+      role: 'admin',
+      expiresAt: Date.now() + SESSION_DURATION,
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
+  }
+
+  return null;
 }
 
 /**

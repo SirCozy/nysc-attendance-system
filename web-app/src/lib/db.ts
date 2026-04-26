@@ -2,7 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type { Member, AttendanceRecord, Event, AdminUser, SyncQueueItem } from '../types';
 
 const DB_NAME = 'nysc-attendance';
-const DB_VERSION = 2;
+const DB_VERSION = 4;
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -10,12 +10,19 @@ export async function getDB(): Promise<IDBPDatabase> {
   if (dbInstance) return dbInstance;
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, _oldVersion) {
+    upgrade(db, oldVersion) {
       // Corps Members store (now Members)
       if (!db.objectStoreNames.contains('members')) {
         const memberStore = db.createObjectStore('members', { keyPath: 'id' });
         memberStore.createIndex('stateCode', 'stateCode', { unique: true });
         memberStore.createIndex('qrData', 'qrData', { unique: true });
+        memberStore.createIndex('pin', 'pin', { unique: true });
+      } else if (oldVersion < 3) {
+        const tx = db.transaction('members', 'versionchange');
+        const memberStore = tx.objectStore('members');
+        if (!memberStore.indexNames.contains('pin')) {
+          memberStore.createIndex('pin', 'pin', { unique: true });
+        }
       }
 
       // Attendance records store
@@ -24,18 +31,32 @@ export async function getDB(): Promise<IDBPDatabase> {
         attendanceStore.createIndex('eventId', 'eventId', { unique: false });
         attendanceStore.createIndex('memberId', 'memberId', { unique: false });
         attendanceStore.createIndex('synced', 'synced', { unique: false });
-        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: true });
+        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
+      } else if (oldVersion < 4) {
+        const tx = db.transaction('attendance', 'versionchange');
+        const attendanceStore = tx.objectStore('attendance');
+        if (attendanceStore.indexNames.contains('memberEvent')) {
+          attendanceStore.deleteIndex('memberEvent');
+        }
+        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
       }
 
       // Events store
       if (!db.objectStoreNames.contains('events')) {
-        db.createObjectStore('events', { keyPath: 'id' });
+        const eventStore = db.createObjectStore('events', { keyPath: 'id' });
+        eventStore.createIndex('qrData', 'qrData', { unique: true });
+      } else if (oldVersion < 4) {
+        const tx = db.transaction('events', 'versionchange');
+        const eventStore = tx.objectStore('events');
+        if (!eventStore.indexNames.contains('qrData')) {
+          eventStore.createIndex('qrData', 'qrData', { unique: true });
+        }
       }
 
       // Admin users store
       if (!db.objectStoreNames.contains('admins')) {
         const adminStore = db.createObjectStore('admins', { keyPath: 'id' });
-        adminStore.createIndex('name', 'name', { unique: true });
+        adminStore.createIndex('pin', 'pin', { unique: true });
       }
 
       // Sync queue store
@@ -71,9 +92,9 @@ export async function getMemberByStateCode(stateCode: string): Promise<Member | 
   return db.getFromIndex('members', 'stateCode', stateCode);
 }
 
-export async function getMemberByQR(qrData: string): Promise<Member | undefined> {
+export async function getMemberByPin(pin: string): Promise<Member | undefined> {
   const db = await getDB();
-  return db.getFromIndex('members', 'qrData', qrData);
+  return db.getFromIndex('members', 'pin', pin);
 }
 
 export async function getAllMembers(): Promise<Member[]> {
@@ -98,9 +119,11 @@ export async function updateAttendance(record: AttendanceRecord): Promise<void> 
   await db.put('attendance', record);
 }
 
-export async function getAttendanceByMemberAndEvent(memberId: string, eventId: string): Promise<AttendanceRecord | undefined> {
+export async function getLatestAttendanceForMemberEvent(memberId: string, eventId: string): Promise<AttendanceRecord | undefined> {
   const db = await getDB();
-  return db.getFromIndex('attendance', 'memberEvent', [memberId, eventId]);
+  const records = await db.getAllFromIndex('attendance', 'memberEvent', [memberId, eventId]);
+  if (records.length === 0) return undefined;
+  return records.sort((a, b) => b.timestamp - a.timestamp)[0];
 }
 
 export async function getAttendanceByEvent(eventId: string): Promise<AttendanceRecord[]> {
@@ -108,10 +131,9 @@ export async function getAttendanceByEvent(eventId: string): Promise<AttendanceR
   return db.getAllFromIndex('attendance', 'eventId', eventId);
 }
 
-export async function checkDuplicateAttendance(memberId: string, eventId: string): Promise<boolean> {
+export async function getAllAttendance(): Promise<AttendanceRecord[]> {
   const db = await getDB();
-  const existing = await db.getFromIndex('attendance', 'memberEvent', [memberId, eventId]);
-  return !!existing;
+  return db.getAll('attendance');
 }
 
 export async function getUnsyncedAttendance(): Promise<AttendanceRecord[]> {
@@ -129,9 +151,33 @@ export async function markAttendanceSynced(id: string): Promise<void> {
   }
 }
 
-export async function getAllAttendance(): Promise<AttendanceRecord[]> {
-  const db = await getDB();
-  return db.getAll('attendance');
+export async function getStats(eventId?: string): Promise<{ totalMembers: number; inCount: number; outCount: number }> {
+  const allMembers = await getAllMembers();
+  const totalMembers = allMembers.length;
+
+  if (!eventId) {
+    return { totalMembers, inCount: 0, outCount: 0 };
+  }
+
+  const records = await getAttendanceByEvent(eventId);
+  const latestByMember = new Map<string, AttendanceRecord>();
+
+  for (const record of records) {
+    const existing = latestByMember.get(record.memberId);
+    if (!existing || record.timestamp > existing.timestamp) {
+      latestByMember.set(record.memberId, record);
+    }
+  }
+
+  let inCount = 0;
+  let outCount = 0;
+
+  for (const record of latestByMember.values()) {
+    if (record.type === 'CHECK-IN') inCount++;
+    else if (record.type === 'CHECK-OUT') outCount++;
+  }
+
+  return { totalMembers, inCount, outCount };
 }
 
 // ============ EVENTS ============
@@ -159,16 +205,39 @@ export async function getAllEvents(): Promise<Event[]> {
 export async function getActiveEvent(): Promise<Event | undefined> {
   const db = await getDB();
   const events = await db.getAll('events');
-  return events.find((e: Event) => e.status === 'active');
+  return events.find((e: Event) => e.status === 'ACTIVE');
+}
+
+export async function activateEvent(id: string): Promise<void> {
+  const db = await getDB();
+  const events = await db.getAll('events');
+
+  for (const existing of events) {
+    if (existing.status === 'ACTIVE' && existing.id !== id) {
+      existing.status = 'ENDED';
+      await db.put('events', existing);
+    }
+  }
+
+  const event = await db.get('events', id);
+  if (event) {
+    event.status = 'ACTIVE';
+    await db.put('events', event);
+  }
 }
 
 export async function closeEvent(id: string): Promise<void> {
   const db = await getDB();
   const event = await db.get('events', id);
   if (event) {
-    event.status = 'closed';
+    event.status = 'ENDED';
     await db.put('events', event);
   }
+}
+
+export async function getEventByQR(qrData: string): Promise<Event | undefined> {
+  const db = await getDB();
+  return db.getFromIndex('events', 'qrData', qrData);
 }
 
 // ============ ADMINS ============
@@ -183,9 +252,9 @@ export async function updateAdmin(admin: AdminUser): Promise<void> {
   await db.put('admins', admin);
 }
 
-export async function getAdminByName(name: string): Promise<AdminUser | undefined> {
+export async function getAdminByPin(pin: string): Promise<AdminUser | undefined> {
   const db = await getDB();
-  return db.getFromIndex('admins', 'name', name);
+  return db.getFromIndex('admins', 'pin', pin);
 }
 
 export async function getAllAdmins(): Promise<AdminUser[]> {
@@ -216,22 +285,3 @@ export async function seedDefaultAdmin(): Promise<void> {
   // No default admin is created when local PIN authentication is used.
 }
 
-export async function getStats(eventId?: string): Promise<{
-  totalMembers: number;
-  totalPresent: number;
-  totalAbsent: number;
-  attendanceRate: number;
-}> {
-  const members = await getAllMembers();
-  const attendance = eventId
-    ? await getAttendanceByEvent(eventId)
-    : await getAllAttendance();
-
-  const totalMembers = members.length;
-  const uniquePresentIds = new Set(attendance.map((a: AttendanceRecord) => a.memberId));
-  const totalPresent = uniquePresentIds.size;
-  const totalAbsent = Math.max(0, totalMembers - totalPresent);
-  const attendanceRate = totalMembers > 0 ? Math.round((totalPresent / totalMembers) * 100) : 0;
-
-  return { totalMembers, totalPresent, totalAbsent, attendanceRate };
-}

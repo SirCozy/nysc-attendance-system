@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import AttendanceGrid from '../components/AttendanceGrid';
 import SyncStatus from '../components/SyncStatus';
-import { getStats, getActiveEvent, getAttendanceByEvent, getAllMembers, getAllAttendance } from '../lib/db';
+import { getStats, getActiveEvent, getAttendanceByEvent, getAllMembers, getAllAttendance, getAllEvents, activateEvent } from '../lib/db';
 import { exportToCSV, downloadCSV, syncAttendance } from '../lib/sync';
 import type { AttendanceRecord, Member, Event } from '../types';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ totalMembers: 0, totalPresent: 0, totalAbsent: 0, attendanceRate: 0 });
+  const [stats, setStats] = useState({ totalMembers: 0, inCount: 0, outCount: 0 });
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -21,6 +22,9 @@ export default function Dashboard() {
   }, [refreshKey]);
 
   const loadData = async () => {
+    const allEvents = await getAllEvents();
+    setEvents(allEvents.sort((a, b) => b.createdAt - a.createdAt));
+
     const event = await getActiveEvent();
     setActiveEvent(event ?? null);
 
@@ -34,14 +38,18 @@ export default function Dashboard() {
     setStats(currentStats);
   };
 
+  const handleSelectEvent = async (id: string) => {
+    if (!id) return;
+    await activateEvent(id);
+    setRefreshKey((k) => k + 1);
+  };
+
   const handleExport = () => {
     const data = records.map((r) => ({
       memberName: r.memberName,
       stateCode: r.stateCode,
-      checkInTime: r.checkInTime,
-      checkOutTime: r.checkOutTime,
-      status: r.status,
-      method: r.method,
+      timestamp: r.timestamp,
+      status: r.type,
     }));
     const csv = exportToCSV(data);
     const eventName = activeEvent?.title ?? 'attendance';
@@ -72,9 +80,26 @@ export default function Dashboard() {
 
       <SyncStatus />
 
+      <div className="event-selector card">
+        <label htmlFor="active-event">Active Event</label>
+        <select
+          id="active-event"
+          className="input-field"
+          value={activeEvent?.id ?? ''}
+          onChange={(e) => handleSelectEvent(e.target.value)}
+        >
+          <option value="">Select active event</option>
+          {events.map((event) => (
+            <option key={event.id} value={event.id}>
+              {event.title} — {event.date} {event.time ? `@ ${event.time}` : ''} ({event.status === 'ACTIVE' ? 'Active' : 'Ended'})
+            </option>
+          ))}
+        </select>
+      </div>
+
       {activeEvent && (
         <div className="event-banner">
-          <strong>{activeEvent.title}</strong> &mdash; {activeEvent.date} @ {activeEvent.location}
+          <strong>{activeEvent.title}</strong> &mdash; {activeEvent.date} @ {activeEvent.time} {activeEvent.location}
         </div>
       )}
 
@@ -84,16 +109,12 @@ export default function Dashboard() {
           <span className="stat-label">Total Members</span>
         </div>
         <div className="stat-card stat-success">
-          <span className="stat-number">{stats.totalPresent}</span>
-          <span className="stat-label">Present</span>
+          <span className="stat-number">{stats.inCount}</span>
+          <span className="stat-label">IN Count</span>
         </div>
         <div className="stat-card stat-danger">
-          <span className="stat-number">{stats.totalAbsent}</span>
-          <span className="stat-label">Absent</span>
-        </div>
-        <div className="stat-card stat-info">
-          <span className="stat-number">{stats.attendanceRate}%</span>
-          <span className="stat-label">Attendance Rate</span>
+          <span className="stat-number">{stats.outCount}</span>
+          <span className="stat-label">OUT Count</span>
         </div>
       </div>
 

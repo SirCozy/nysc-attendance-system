@@ -11,6 +11,7 @@ export default function EventsPage() {
   const [form, setForm] = useState({
     title: '',
     date: new Date().toISOString().split('T')[0] ?? '',
+    time: new Date().toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5) ?? '09:00',
     location: '',
   });
   const [error, setError] = useState('');
@@ -48,18 +49,21 @@ export default function EventsPage() {
       await closeEvent(activeEvent.id);
     }
 
+    const eventId = generateId();
     const event: Event = {
-      id: generateId(),
+      id: eventId,
       title: form.title.trim(),
       date: form.date,
+      time: form.time,
       location: form.location.trim(),
+      qrData: `EVENT-${eventId}`,
       createdBy: 'admin',
       createdAt: Date.now(),
-      status: 'active',
+      status: 'ACTIVE',
     };
 
     await addEvent(event);
-    setForm({ title: '', date: new Date().toISOString().split('T')[0] ?? '', location: '' });
+    setForm({ title: '', date: new Date().toISOString().split('T')[0] ?? '', time: new Date().toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5) ?? '09:00', location: '' });
     setShowForm(false);
     await loadEvents();
   };
@@ -103,18 +107,29 @@ export default function EventsPage() {
                 className="input-field"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
+                required
               />
             </div>
             <div className="form-group">
-              <label>Location</label>
+              <label>Time</label>
               <input
-                type="text"
+                type="time"
                 className="input-field"
-                placeholder="e.g., LGA Secretariat"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+                required
               />
             </div>
+          </div>
+          <div className="form-group">
+            <label>Location</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="e.g., LGA Secretariat"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
           </div>
           <p className="form-hint">Creating a new event will close the current active event.</p>
           <button type="submit" className="btn btn-primary">
@@ -125,24 +140,24 @@ export default function EventsPage() {
 
       <div className="events-list">
         {events.map((event) => (
-          <div key={event.id} className={`event-card card ${event.status === 'active' ? 'event-active' : ''}`}>
+          <div key={event.id} className={`event-card card ${event.status === 'ACTIVE' ? 'event-active' : ''}`}>
             <div className="event-info">
               <div className="event-title-row">
                 <strong>{event.title}</strong>
-                <span className={`badge ${event.status === 'active' ? 'badge-success' : 'badge-muted'}`}>
-                  {event.status === 'active' ? 'Active' : 'Closed'}
+                <span className={`badge ${event.status === 'ACTIVE' ? 'badge-success' : 'badge-muted'}`}>
+                  {event.status === 'ACTIVE' ? 'Active' : 'Ended'}
                 </span>
               </div>
               <div className="event-details">
-                <span>{event.date}</span>
+                <span>{event.date} {event.time ? `@ ${event.time}` : ''}</span>
                 {event.location && <span> &bull; {event.location}</span>}
-                <span> &bull; {eventCounts[event.id] ?? 0} check-ins</span>
+                <span> &bull; {eventCounts[event.id] ?? 0} scans</span>
               </div>
             </div>
-            {event.status === 'active' && (
+            {event.status === 'ACTIVE' && (
               <div className="event-actions">
                 <button className="btn btn-sm btn-danger" onClick={() => handleClose(event.id)}>
-                  Close Event
+                  End Event
                 </button>
               </div>
             )}

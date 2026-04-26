@@ -92,13 +92,12 @@ export async function processSyncQueue(): Promise<void> {
  * Export attendance data as CSV string.
  */
 export function exportToCSV(
-  data: Array<{ memberName: string; stateCode: string; checkInTime: number | null; checkOutTime: number | null; status: string; method: string }>
+  data: Array<{ memberName: string; stateCode: string; timestamp: number; status: string }>
 ): string {
-  const headers = 'Name,State Code,Check-In Time,Check-Out Time,Status,Method\n';
+  const headers = 'Name,State Code,Timestamp,Status\n';
   const rows = data.map((r) => {
-    const checkInTime = r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-';
-    const checkOutTime = r.checkOutTime ? new Date(r.checkOutTime).toLocaleString() : '-';
-    return `"${r.memberName}","${r.stateCode}","${checkInTime}","${checkOutTime}","${r.status}","${r.method}"`;
+    const timestamp = new Date(r.timestamp).toLocaleString();
+    return `"${r.memberName}","${r.stateCode}","${timestamp}","${r.status}"`;
   });
   return headers + rows.join('\n');
 }

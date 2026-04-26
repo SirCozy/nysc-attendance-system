@@ -5,11 +5,12 @@ import { useState, useEffect } from 'react';
 interface HeaderProps {
   currentView: AppView;
   onNavigate: (view: AppView) => void;
-  adminName: string;
+  userName: string;
+  userRole: 'admin' | 'member' | null;
   onLogout: () => void;
 }
 
-export default function Header({ currentView, onNavigate, adminName, onLogout }: HeaderProps) {
+export default function Header({ currentView, onNavigate, userName, userRole, onLogout }: HeaderProps) {
   const [online, setOnline] = useState(isOnline());
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -24,12 +25,14 @@ export default function Header({ currentView, onNavigate, adminName, onLogout }:
     };
   }, []);
 
-  const navItems: { view: AppView; label: string }[] = [
+  const navItems: { view: AppView; label: string }[] = userRole === 'admin' ? [
     { view: 'dashboard', label: 'Dashboard' },
     { view: 'scanner', label: 'Scan QR' },
     { view: 'members', label: 'Members' },
     { view: 'events', label: 'Events' },
     { view: 'generate-qr', label: 'Generate QR' },
+  ] : [
+    { view: 'scanner', label: 'Scan QR' },
   ];
 
   return (
@@ -61,7 +64,7 @@ export default function Header({ currentView, onNavigate, adminName, onLogout }:
           </button>
         ))}
         <div className="nav-user">
-          <span className="nav-user-name">{adminName}</span>
+          <span className="nav-user-name">{userName}</span>
           <button className="nav-btn logout-btn" onClick={onLogout}>
             Logout
           </button>

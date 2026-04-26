@@ -13,14 +13,16 @@ import './App.css';
 
 export default function App() {
   const [view, setView] = useState<AppView>('login');
-  const [adminName, setAdminName] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const session = getSession();
     if (session) {
-      setAdminName(session.adminName);
-      setView('dashboard');
+      setUserName(session.userName);
+      setUserRole(session.role);
+      setView(session.role === 'admin' ? 'dashboard' : 'scanner');
     }
     setLoading(false);
 
@@ -28,14 +30,16 @@ export default function App() {
     return cleanupSync;
   }, []);
 
-  const handleLogin = (name: string) => {
-    setAdminName(name);
-    setView('dashboard');
+  const handleLogin = (name: string, role: 'admin' | 'member') => {
+    setUserName(name);
+    setUserRole(role);
+    setView(role === 'admin' ? 'dashboard' : 'scanner');
   };
 
   const handleLogout = () => {
     logout();
-    setAdminName('');
+    setUserName('');
+    setUserRole(null);
     setView('login');
   };
 
@@ -57,15 +61,16 @@ export default function App() {
       <Header
         currentView={view}
         onNavigate={setView}
-        adminName={adminName}
+        userName={userName}
+        userRole={userRole}
         onLogout={handleLogout}
       />
       <main className="main-content">
-        {view === 'dashboard' && <Dashboard />}
+        {view === 'dashboard' && userRole === 'admin' && <Dashboard />}
         {view === 'scanner' && <ScanPage />}
-        {view === 'members' && <MembersPage />}
-        {view === 'events' && <EventsPage />}
-        {view === 'generate-qr' && <GenerateQRPage />}
+        {view === 'members' && userRole === 'admin' && <MembersPage />}
+        {view === 'events' && userRole === 'admin' && <EventsPage />}
+        {view === 'generate-qr' && userRole === 'admin' && <GenerateQRPage />}
       </main>
     </div>
   );

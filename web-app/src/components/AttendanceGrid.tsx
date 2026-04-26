@@ -11,7 +11,17 @@ export default function AttendanceGrid({ records, members, onExport }: Attendanc
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'present' | 'absent'>('all');
 
-  const presentIds = new Set(records.map((r) => r.memberId));
+  const latestRecordByMember = new Map<string, AttendanceRecord>();
+  records
+    .slice()
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .forEach((record) => latestRecordByMember.set(record.memberId, record));
+
+  const presentIds = new Set<string>(
+    Array.from(latestRecordByMember.values())
+      .filter((record) => record.type === 'CHECK-IN')
+      .map((record) => record.memberId)
+  );
 
   const filteredMembers = members.filter((m) => {
     const matchesSearch =
@@ -23,10 +33,15 @@ export default function AttendanceGrid({ records, members, onExport }: Attendanc
     return matchesSearch;
   });
 
-  const getCheckInTime = (memberId: string): string => {
-    const record = records.find((r) => r.memberId === memberId);
-    if (!record || !record.checkInTime) return '-';
-    return new Date(record.checkInTime).toLocaleTimeString();
+  const getLastTime = (memberId: string): string => {
+    const record = latestRecordByMember.get(memberId);
+    if (!record) return '-';
+    return new Date(record.timestamp).toLocaleTimeString();
+  };
+
+  const getMemberStatus = (memberId: string): 'Present' | 'Absent' => {
+    const record = latestRecordByMember.get(memberId);
+    return record?.type === 'CHECK-IN' ? 'Present' : 'Absent';
   };
 
   return (
@@ -85,10 +100,10 @@ export default function AttendanceGrid({ records, members, onExport }: Attendanc
                   <td className="mono">{member.stateCode}</td>
                   <td>
                     <span className={`badge ${isPresent ? 'badge-success' : 'badge-danger'}`}>
-                      {isPresent ? 'Present' : 'Absent'}
+                      {getMemberStatus(member.id)}
                     </span>
                   </td>
-                  <td className="mono">{getCheckInTime(member.id)}</td>
+                  <td className="mono">{getLastTime(member.id)}</td>
                 </tr>
               );
             })}
