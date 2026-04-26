@@ -53,4 +53,4 @@ export interface SyncQueueItem {
   retries: number;
 }
 
-export type AppView = 'login' | 'scanner' | 'dashboard' | 'members' | 'generate-qr' | 'events';
+export type AppView = 'landing' | 'login' | 'member-login' | 'member-signup' | 'scanner' | 'dashboard' | 'members' | 'generate-qr' | 'events' | 'member-dashboard';

@@ -31,14 +31,23 @@ export default function Header({ currentView, onNavigate, userName, userRole, on
     { view: 'members', label: 'Members' },
     { view: 'events', label: 'Events' },
     { view: 'generate-qr', label: 'Generate QR' },
-  ] : [
+  ] : userRole === 'member' ? [
+    { view: 'member-dashboard', label: 'Dashboard' },
     { view: 'scanner', label: 'Scan QR' },
-  ];
+  ] : [];
+
+  const handleHomeClick = () => {
+    if (userRole === 'admin') {
+      onNavigate('dashboard');
+    } else if (userRole === 'member') {
+      onNavigate('member-dashboard');
+    }
+  };
 
   return (
     <header className="header">
       <div className="header-top">
-        <div className="header-brand" onClick={() => onNavigate('dashboard')}>
+        <div className="header-brand" onClick={handleHomeClick}>
           <span className="header-logo">NYSC</span>
           <span className="header-title">Attendance</span>
         </div>
