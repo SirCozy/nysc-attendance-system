@@ -11,7 +11,7 @@ export async function getDB(): Promise<IDBPDatabase> {
 
   try {
     dbInstance = await openDB(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
+      upgrade(db, oldVersion, _newVersion, transaction) {
         console.log(`Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
         try {
           // Corps Members store (now Members)
@@ -21,7 +21,10 @@ export async function getDB(): Promise<IDBPDatabase> {
             memberStore.createIndex('qrData', 'qrData', { unique: true });
             memberStore.createIndex('pin', 'pin', { unique: true });
           } else if (oldVersion < 3) {
-            const memberStore = db.objectStore('members');
+            const memberStore = transaction.objectStore('members');
+            if (!memberStore) {
+              throw new Error('Missing members store during upgrade');
+            }
             if (!memberStore.indexNames.contains('pin')) {
               memberStore.createIndex('pin', 'pin', { unique: true });
             }
@@ -35,7 +38,10 @@ export async function getDB(): Promise<IDBPDatabase> {
             attendanceStore.createIndex('synced', 'synced', { unique: false });
             attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
           } else if (oldVersion < 4) {
-            const attendanceStore = db.objectStore('attendance');
+            const attendanceStore = transaction.objectStore('attendance');
+            if (!attendanceStore) {
+              throw new Error('Missing attendance store during upgrade');
+            }
             if (attendanceStore.indexNames.contains('memberEvent')) {
               attendanceStore.deleteIndex('memberEvent');
             }
@@ -47,7 +53,10 @@ export async function getDB(): Promise<IDBPDatabase> {
             const eventStore = db.createObjectStore('events', { keyPath: 'id' });
             eventStore.createIndex('qrData', 'qrData', { unique: true });
           } else if (oldVersion < 4) {
-            const eventStore = db.objectStore('events');
+            const eventStore = transaction.objectStore('events');
+            if (!eventStore) {
+              throw new Error('Missing events store during upgrade');
+            }
             if (!eventStore.indexNames.contains('qrData')) {
               eventStore.createIndex('qrData', 'qrData', { unique: true });
             }
