@@ -20,106 +20,116 @@ export async function memberSignup(
   serviceYear: string,
   pin: string
 ): Promise<{ success: boolean; error?: string }> {
-  const normalizedPin = pin.trim();
-  const normalizedStateCode = stateCode.trim().toUpperCase();
-  const normalizedName = fullName.trim();
+  try {
+    const normalizedPin = pin.trim();
+    const normalizedStateCode = stateCode.trim().toUpperCase();
+    const normalizedName = fullName.trim();
 
-  // Validate PIN: 4-6 digits
-  if (!/^[0-9]{4,6}$/.test(normalizedPin)) {
-    return { success: false, error: 'PIN must be 4-6 digits' };
+    // Validate PIN: 4-6 digits
+    if (!/^[0-9]{4,6}$/.test(normalizedPin)) {
+      return { success: false, error: 'PIN must be 4-6 digits' };
+    }
+
+    // Validate state code format
+    if (!/^[A-Z]{2}\/\d{2}[A-Z]\/\d{4}$/.test(normalizedStateCode)) {
+      return { success: false, error: 'Invalid state code format (e.g., AB/12X/1234)' };
+    }
+
+    // Validate name
+    if (normalizedName.length < 2) {
+      return { success: false, error: 'Name must be at least 2 characters' };
+    }
+
+    // Validate service year format (YYYY-YYYY)
+    if (!/^\d{4}-\d{4}$/.test(serviceYear)) {
+      return { success: false, error: 'Service year must be in format YYYY-YYYY' };
+    }
+
+    // Check if state code already exists
+    const existingMember = await getMemberByStateCode(normalizedStateCode);
+    if (existingMember) {
+      return { success: false, error: 'State code already registered' };
+    }
+
+    // Check if PIN already exists
+    const existingPin = await getMemberByPin(normalizedPin);
+    if (existingPin) {
+      return { success: false, error: 'PIN already in use' };
+    }
+
+    // Create new member
+    const newMember: Member = {
+      id: `member-${Date.now()}`,
+      stateCode: normalizedStateCode,
+      fullName: normalizedName,
+      serviceYear: serviceYear,
+      pin: normalizedPin,
+      cdsGroup: '',
+      phone: '',
+      qrData: '',
+      role: 'member',
+      registeredAt: Date.now(),
+    };
+
+    await addMember(newMember);
+    return { success: true };
+  } catch (error) {
+    console.error('Member signup failed:', error);
+    return { success: false, error: 'Failed to create account. Please try again.' };
   }
-
-  // Validate state code format
-  if (!/^[A-Z]{2}\/\d{2}[A-Z]\/\d{4}$/.test(normalizedStateCode)) {
-    return { success: false, error: 'Invalid state code format (e.g., AB/12X/1234)' };
-  }
-
-  // Validate name
-  if (normalizedName.length < 2) {
-    return { success: false, error: 'Name must be at least 2 characters' };
-  }
-
-  // Validate service year format (YYYY-YYYY)
-  if (!/^\d{4}-\d{4}$/.test(serviceYear)) {
-    return { success: false, error: 'Service year must be in format YYYY-YYYY' };
-  }
-
-  // Check if state code already exists
-  const existingMember = await getMemberByStateCode(normalizedStateCode);
-  if (existingMember) {
-    return { success: false, error: 'State code already registered' };
-  }
-
-  // Check if PIN already exists
-  const existingPin = await getMemberByPin(normalizedPin);
-  if (existingPin) {
-    return { success: false, error: 'PIN already in use' };
-  }
-
-  // Create new member
-  const newMember: Member = {
-    id: `member-${Date.now()}`,
-    stateCode: normalizedStateCode,
-    fullName: normalizedName,
-    serviceYear: serviceYear,
-    pin: normalizedPin,
-    cdsGroup: '',
-    phone: '',
-    qrData: '',
-    role: 'member',
-    registeredAt: Date.now(),
-  };
-
-  await addMember(newMember);
-  return { success: true };
 }
 
 /**
  * Member login using stateCode + PIN.
  */
 export async function memberLogin(stateCode: string, pin: string): Promise<Session | null> {
-  const normalizedStateCode = stateCode.trim().toUpperCase();
-  const normalizedPin = pin.trim();
+  try {
+    const normalizedStateCode = stateCode.trim().toUpperCase();
+    const normalizedPin = pin.trim();
 
-  // Validate PIN: 4-6 digits
-  if (!/^[0-9]{4,6}$/.test(normalizedPin)) {
-    return null;
-  }
+    // Validate PIN: 4-6 digits
+    if (!/^[0-9]{4,6}$/.test(normalizedPin)) {
+      return null;
+    }
 
-  // Get member by state code
-  const member = await getMemberByStateCode(normalizedStateCode);
-  if (!member) {
-    return null;
-  }
+    // Get member by state code
+    const member = await getMemberByStateCode(normalizedStateCode);
+    if (!member) {
+      return null;
+    }
 
-  // Check PIN matches
-  if (member.pin !== normalizedPin) {
-    return null;
-  }
+    // Check PIN matches
+    if (member.pin !== normalizedPin) {
+      return null;
+    }
 
-  // Validate service year hasn't expired
-  const currentYear = new Date().getFullYear();
-  const parts = member.serviceYear.split('-');
-  if (parts.length !== 2) {
-    return null;
-  }
-  const endPart = parts[1] ?? '';
-  if (!endPart) {
-    return null;
-  }
-  const endYear = parseInt(endPart, 10);
-  if (Number.isNaN(endYear) || endYear < currentYear) {
-    return null;
-  }
+    // Validate service year hasn't expired
+    const currentYear = new Date().getFullYear();
+    const parts = member.serviceYear.split('-');
+    if (parts.length !== 2) {
+      return null;
+    }
+    const endPart = parts[1] ?? '';
+    if (!endPart) {
+      return null;
+    }
+    const endYear = parseInt(endPart, 10);
+    if (Number.isNaN(endYear) || endYear < currentYear) {
+      return null;
+    }
 
-  const session: Session = {
-    userId: member.id,
-    userName: member.fullName,
-    role: 'member',
-    expiresAt: Date.now() + SESSION_DURATION,
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
+    const session: Session = {
+      userId: member.id,
+      userName: member.fullName,
+      role: 'member',
+      expiresAt: Date.now() + SESSION_DURATION,
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
+  } catch (error) {
+    console.error('Member login failed:', error);
+    return null;
+  }
 }
 
 /**

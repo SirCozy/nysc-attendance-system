@@ -47,15 +47,20 @@ export default function MemberSignup({ onSignupComplete, onBackToLanding }: Memb
 
     setLoading(true);
 
-    const result = await memberSignup(fullName, stateCode, serviceYear, pin);
-    if (result.success) {
-      // Signup successful - redirect to member login
-      onSignupComplete();
-    } else {
-      setError(result.error || 'Signup failed');
+    try {
+      const result = await memberSignup(fullName, stateCode, serviceYear, pin);
+      if (result.success) {
+        // Signup successful - redirect to member login
+        onSignupComplete();
+      } else {
+        setError(result.error || 'Signup failed');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

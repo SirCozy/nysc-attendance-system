@@ -9,92 +9,125 @@ let dbInstance: IDBPDatabase | null = null;
 export async function getDB(): Promise<IDBPDatabase> {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      // Corps Members store (now Members)
-      if (!db.objectStoreNames.contains('members')) {
-        const memberStore = db.createObjectStore('members', { keyPath: 'id' });
-        memberStore.createIndex('stateCode', 'stateCode', { unique: true });
-        memberStore.createIndex('qrData', 'qrData', { unique: true });
-        memberStore.createIndex('pin', 'pin', { unique: true });
-      } else if (oldVersion < 3) {
-        const tx = db.transaction('members', 'versionchange');
-        const memberStore = tx.objectStore('members');
-        if (!memberStore.indexNames.contains('pin')) {
-          memberStore.createIndex('pin', 'pin', { unique: true });
+  try {
+    dbInstance = await openDB(DB_NAME, DB_VERSION, {
+      upgrade(db, oldVersion) {
+        console.log(`Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
+        try {
+          // Corps Members store (now Members)
+          if (!db.objectStoreNames.contains('members')) {
+            const memberStore = db.createObjectStore('members', { keyPath: 'id' });
+            memberStore.createIndex('stateCode', 'stateCode', { unique: true });
+            memberStore.createIndex('qrData', 'qrData', { unique: true });
+            memberStore.createIndex('pin', 'pin', { unique: true });
+          } else if (oldVersion < 3) {
+            const memberStore = db.objectStore('members');
+            if (!memberStore.indexNames.contains('pin')) {
+              memberStore.createIndex('pin', 'pin', { unique: true });
+            }
+          }
+
+          // Attendance records store
+          if (!db.objectStoreNames.contains('attendance')) {
+            const attendanceStore = db.createObjectStore('attendance', { keyPath: 'id' });
+            attendanceStore.createIndex('eventId', 'eventId', { unique: false });
+            attendanceStore.createIndex('memberId', 'memberId', { unique: false });
+            attendanceStore.createIndex('synced', 'synced', { unique: false });
+            attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
+          } else if (oldVersion < 4) {
+            const attendanceStore = db.objectStore('attendance');
+            if (attendanceStore.indexNames.contains('memberEvent')) {
+              attendanceStore.deleteIndex('memberEvent');
+            }
+            attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
+          }
+
+          // Events store
+          if (!db.objectStoreNames.contains('events')) {
+            const eventStore = db.createObjectStore('events', { keyPath: 'id' });
+            eventStore.createIndex('qrData', 'qrData', { unique: true });
+          } else if (oldVersion < 4) {
+            const eventStore = db.objectStore('events');
+            if (!eventStore.indexNames.contains('qrData')) {
+              eventStore.createIndex('qrData', 'qrData', { unique: true });
+            }
+          }
+
+          // Admin users store
+          if (!db.objectStoreNames.contains('admins')) {
+            const adminStore = db.createObjectStore('admins', { keyPath: 'id' });
+            adminStore.createIndex('pin', 'pin', { unique: true });
+          }
+
+          // Sync queue store
+          if (!db.objectStoreNames.contains('syncQueue')) {
+            const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
+            syncStore.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+        } catch (error) {
+          console.error('Database upgrade failed:', error);
+          throw error;
         }
-      }
-
-      // Attendance records store
-      if (!db.objectStoreNames.contains('attendance')) {
-        const attendanceStore = db.createObjectStore('attendance', { keyPath: 'id' });
-        attendanceStore.createIndex('eventId', 'eventId', { unique: false });
-        attendanceStore.createIndex('memberId', 'memberId', { unique: false });
-        attendanceStore.createIndex('synced', 'synced', { unique: false });
-        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
-      } else if (oldVersion < 4) {
-        const tx = db.transaction('attendance', 'versionchange');
-        const attendanceStore = tx.objectStore('attendance');
-        if (attendanceStore.indexNames.contains('memberEvent')) {
-          attendanceStore.deleteIndex('memberEvent');
-        }
-        attendanceStore.createIndex('memberEvent', ['memberId', 'eventId'], { unique: false });
-      }
-
-      // Events store
-      if (!db.objectStoreNames.contains('events')) {
-        const eventStore = db.createObjectStore('events', { keyPath: 'id' });
-        eventStore.createIndex('qrData', 'qrData', { unique: true });
-      } else if (oldVersion < 4) {
-        const tx = db.transaction('events', 'versionchange');
-        const eventStore = tx.objectStore('events');
-        if (!eventStore.indexNames.contains('qrData')) {
-          eventStore.createIndex('qrData', 'qrData', { unique: true });
-        }
-      }
-
-      // Admin users store
-      if (!db.objectStoreNames.contains('admins')) {
-        const adminStore = db.createObjectStore('admins', { keyPath: 'id' });
-        adminStore.createIndex('pin', 'pin', { unique: true });
-      }
-
-      // Sync queue store
-      if (!db.objectStoreNames.contains('syncQueue')) {
-        const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
-        syncStore.createIndex('timestamp', 'timestamp', { unique: false });
-      }
-    },
-  });
-
-  return dbInstance;
+      },
+    });
+    console.log('Database initialized successfully');
+    return dbInstance;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
+  }
 }
 
 // ============ MEMBERS ============
 
 export async function addMember(member: Member): Promise<void> {
-  const db = await getDB();
-  await db.put('members', member);
+  try {
+    const db = await getDB();
+    await db.put('members', member);
+  } catch (error) {
+    console.error('Failed to add member:', error);
+    throw error;
+  }
 }
 
 export async function updateMember(member: Member): Promise<void> {
-  const db = await getDB();
-  await db.put('members', member);
+  try {
+    const db = await getDB();
+    await db.put('members', member);
+  } catch (error) {
+    console.error('Failed to update member:', error);
+    throw error;
+  }
 }
 
 export async function getMember(id: string): Promise<Member | undefined> {
-  const db = await getDB();
-  return db.get('members', id);
+  try {
+    const db = await getDB();
+    return await db.get('members', id);
+  } catch (error) {
+    console.error('Failed to get member:', error);
+    throw error;
+  }
 }
 
 export async function getMemberByStateCode(stateCode: string): Promise<Member | undefined> {
-  const db = await getDB();
-  return db.getFromIndex('members', 'stateCode', stateCode);
+  try {
+    const db = await getDB();
+    return await db.getFromIndex('members', 'stateCode', stateCode);
+  } catch (error) {
+    console.error('Failed to get member by state code:', error);
+    throw error;
+  }
 }
 
 export async function getMemberByPin(pin: string): Promise<Member | undefined> {
-  const db = await getDB();
-  return db.getFromIndex('members', 'pin', pin);
+  try {
+    const db = await getDB();
+    return await db.getFromIndex('members', 'pin', pin);
+  } catch (error) {
+    console.error('Failed to get member by PIN:', error);
+    throw error;
+  }
 }
 
 export async function getAllMembers(): Promise<Member[]> {

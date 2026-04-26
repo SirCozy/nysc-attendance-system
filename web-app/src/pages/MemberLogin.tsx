@@ -15,30 +15,35 @@ export default function MemberLogin({ onLogin, onBackToLanding }: MemberLoginPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
     const trimmedStateCode = stateCode.trim().toUpperCase();
     const trimmedPin = pin.trim();
 
     if (!trimmedStateCode) {
       setError('State code is required');
-      setLoading(false);
       return;
     }
 
     if (!/^[0-9]{4,6}$/.test(trimmedPin)) {
       setError('PIN must be 4-6 digits');
-      setLoading(false);
       return;
     }
 
-    const session = await memberLogin(trimmedStateCode, trimmedPin);
-    if (session) {
-      onLogin(session.userName, 'member');
-    } else {
-      setError('Invalid state code or PIN');
+    setLoading(true);
+
+    try {
+      const session = await memberLogin(trimmedStateCode, trimmedPin);
+      if (session) {
+        onLogin(session.userName, 'member');
+      } else {
+        setError('Invalid state code or PIN');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
